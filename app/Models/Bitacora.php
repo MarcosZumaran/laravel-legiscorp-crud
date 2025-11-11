@@ -2,13 +2,13 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use ESolution\DBEncryption\Traits\EncryptedAttribute;
 
 class Bitacora extends Model
 {
-    use HasFactory;
+    use EncryptedAttribute;
 
     protected $table = 'bitacora';
     protected $primaryKey = 'id';
@@ -23,12 +23,17 @@ class Bitacora extends Model
         'ip',
     ];
 
-    protected $casts = [
-        'fecha' => 'datetime',
-        'accion' => 'encrypted',
+    // ✅ Campos que se encriptarán
+    protected $encryptable = [
+        'accion',
+        'ip',
     ];
 
-    // TIPOS DE ACCIÓN COMUNES
+    protected $casts = [
+        'fecha' => 'datetime',
+    ];
+
+    // Tipos de acción comunes (mantenido para referencia)
     const ACCIONES = [
         'LOGIN',
         'LOGOUT',
@@ -41,18 +46,13 @@ class Bitacora extends Model
         'ACCESO_DENEGADO'
     ];
 
-    // ATRIBUTOS POR DEFECTO
-    protected $attributes = [
-        'fecha' => null, // La BD usa GETDATE() por defecto
-    ];
-
-    // RELACIONES
+    // Relación con Usuario
     public function usuario(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'usuario_id');
     }
 
-    // SCOPES PARA BÚSQUEDAS
+    // Scopes útiles
     public function scopePorUsuario($query, $usuarioId)
     {
         return $query->where('usuario_id', $usuarioId);
@@ -60,12 +60,7 @@ class Bitacora extends Model
 
     public function scopePorAccion($query, $accion)
     {
-        return $query->where('accion', 'LIKE', "%{$accion}%");
-    }
-
-    public function scopePorIp($query, $ip)
-    {
-        return $query->where('ip', $ip);
+        return $query->whereEncrypted('accion', 'LIKE', "%{$accion}%");
     }
 
     public function scopeEntreFechas($query, $fechaInicio, $fechaFin)
@@ -83,75 +78,21 @@ class Bitacora extends Model
         return $query->whereDate('fecha', today());
     }
 
-    public function scopeOrdenarPorFecha($query, $direccion = 'desc')
-    {
-        return $query->orderBy('fecha', $direccion);
-    }
-
-    public function scopeBuscar($query, $termino)
-    {
-        return $query->where('accion', 'LIKE', "%{$termino}%")
-                    ->orWhere('ip', 'LIKE', "%{$termino}%")
-                    ->orWhereHas('usuario', function ($q) use ($termino) {
-                        $q->where('nombres', 'LIKE', "%{$termino}%")
-                          ->orWhere('apellidos', 'LIKE', "%{$termino}%")
-                          ->orWhere('correo', 'LIKE', "%{$termino}%");
-                    });
-    }
-
-    // ATRIBUTOS CALCULADOS
-    public function getAccionCortaAttribute()
-    {
-        return strlen($this->accion) > 100 
-            ? substr($this->accion, 0, 100) . '...' 
-            : $this->accion;
-    }
-
-    public function getFechaFormateadaAttribute()
-    {
-        return $this->fecha ? $this->fecha->format('d/m/Y H:i:s') : 'Sin fecha';
-    }
-
-    public function getEsRecienteAttribute()
-    {
-        return $this->fecha >= now()->subHour();
-    }
-
-    public function getTipoAccionAttribute()
-    {
-        foreach (self::ACCIONES as $accion) {
-            if (str_contains(strtoupper($this->accion), $accion)) {
-                return $accion;
-            }
-        }
-        return 'OTRO';
-    }
-
-    // MÉTODOS UTILITARIOS
+    // Método utilitario para registrar (mantenido porque es muy útil)
     public static function registrar($usuarioId, $accion, $ip = null)
     {
         return self::create([
             'usuario_id' => $usuarioId,
             'accion' => $accion,
             'ip' => $ip ?: request()->ip(),
-            'fecha' => now(),
         ]);
     }
 
-    public static function actividadesRecientesUsuario($usuarioId, $horas = 24)
-    {
-        return self::porUsuario($usuarioId)
-                  ->recientes($horas)
-                  ->ordenarPorFecha()
-                  ->get();
-    }
-
-    // VALIDACIÓN AUTOMÁTICA
+    // Prevenir modificaciones y eliminaciones (mantenido por seguridad)
     protected static function boot()
     {
         parent::boot();
 
-        // La bitácora es de solo lectura - prevenir modificaciones/eliminaciones
         static::updating(function ($model) {
             throw new \Exception("Los registros de bitácora no pueden ser modificados.");
         });
@@ -159,14 +100,5 @@ class Bitacora extends Model
         static::deleting(function ($model) {
             throw new \Exception("Los registros de bitácora no pueden ser eliminados.");
         });
-    }
-
-    /**
-     * Representación en string
-     */
-    public function __toString(): string
-    {
-        $usuario = $this->usuario ? $this->usuario->nombres : 'Usuario desconocido';
-        return "{$usuario} - {$this->accion_corta} - {$this->fecha_formateada}";
     }
 }

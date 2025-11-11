@@ -2,18 +2,16 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use ESolution\DBEncryption\Traits\EncryptedAttribute;
 
 class Documento extends Model
 {
-    use HasFactory;
+    use EncryptedAttribute;
 
     protected $table = 'documentos';
-    
-    // Configuración de clave primaria
     protected $primaryKey = 'id';
     public $incrementing = true;
     protected $keyType = 'int';
@@ -37,6 +35,13 @@ class Documento extends Model
         'etiquetas',
     ];
 
+    //Campos que se encriptarán
+    protected $encryptable = [
+        'nombre_archivo',
+        'descripcion',
+        'ruta',
+    ];
+
     protected $casts = [
         'fecha_subida' => 'datetime',
         'es_carpeta' => 'boolean',
@@ -44,7 +49,7 @@ class Documento extends Model
         'tamano_bytes' => 'integer',
     ];
 
-    // CATEGORÍAS PERMITIDAS
+    // Categorías permitidas
     const CATEGORIAS = [
         'General',
         'Contrato',
@@ -54,7 +59,7 @@ class Documento extends Model
         'Otro'
     ];
 
-    // RELACIONES
+    // Relaciones
     public function usuario(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'subido_por');
@@ -80,7 +85,7 @@ class Documento extends Model
         return $this->hasMany(Documento::class, 'carpeta_padre_id');
     }
 
-    // 🎯 SCOPES PARA BÚSQUEDAS
+    // Scopes útiles
     public function scopePorCategoria($query, $categoria)
     {
         return $query->where('categoria', $categoria);
@@ -124,54 +129,7 @@ class Documento extends Model
         return $query->where('fecha_subida', '>=', now()->subDays($dias));
     }
 
-    // ATRIBUTOS CALCULADOS
-    public function getTamanoFormateadoAttribute()
-    {
-        if (!$this->tamano_bytes) return '0 Bytes';
-
-        $unidades = ['Bytes', 'KB', 'MB', 'GB'];
-        $tamano = $this->tamano_bytes;
-        
-        for ($i = 0; $tamano >= 1024 && $i < count($unidades) - 1; $i++) {
-            $tamano /= 1024;
-        }
-
-        return round($tamano, 2) . ' ' . $unidades[$i];
-    }
-
-    public function getEsArchivoAttribute()
-    {
-        return !$this->es_carpeta;
-    }
-
-    public function getRutaCompletaAttribute()
-    {
-        return storage_path('app/' . $this->ruta);
-    }
-
-    public function getEtiquetasArrayAttribute()
-    {
-        return $this->etiquetas ? explode(',', $this->etiquetas) : [];
-    }
-
-    // MÉTODOS UTILITARIOS
-    public function esImagen()
-    {
-        return in_array($this->tipo_archivo, ['jpg', 'jpeg', 'png', 'gif', 'webp']);
-    }
-
-    public function esDocumento()
-    {
-        return in_array($this->tipo_archivo, ['pdf', 'doc', 'docx', 'txt']);
-    }
-
-    public function puedeEliminar()
-    {
-        // No se puede eliminar si tiene archivos hijos
-        return !$this->archivosHijos()->exists();
-    }
-
-    // VALIDACIÓN DE CATEGORÍA
+    // Validación de categoría
     public function setCategoriaAttribute($value)
     {
         if (!in_array($value, self::CATEGORIAS)) {
@@ -180,6 +138,7 @@ class Documento extends Model
         $this->attributes['categoria'] = $value;
     }
 
+    // Mutator para etiquetas (mantenido porque transforma datos)
     public function setEtiquetasAttribute($value)
     {
         if (is_array($value)) {
@@ -187,32 +146,5 @@ class Documento extends Model
         } else {
             $this->attributes['etiquetas'] = $value;
         }
-    }
-
-    // VALIDACIÓN AUTOMÁTICA
-    protected static function boot()
-    {
-        parent::boot();
-
-        static::saving(function ($model) {
-            // Validar que carpeta_padre_id sea una carpeta si se especifica
-            if ($model->carpeta_padre_id) {
-                $carpetaPadre = Documento::find($model->carpeta_padre_id);
-                if (!$carpetaPadre || !$carpetaPadre->es_carpeta) {
-                    throw new \Exception("El documento padre debe ser una carpeta.");
-                }
-            }
-
-            // Validar que el usuario existe
-            if ($model->subido_por && !Usuario::where('id', $model->subido_por)->exists()) {
-                throw new \Exception("El usuario con ID {$model->subido_por} no existe.");
-            }
-        });
-
-        static::deleting(function ($model) {
-            if (!$model->puedeEliminar()) {
-                throw new \Exception("No se puede eliminar porque contiene archivos.");
-            }
-        });
     }
 }

@@ -8,83 +8,33 @@ use Illuminate\Http\JsonResponse;
 
 class MateriaCasoController extends Controller
 {
-    /**
-     * Mostrar materias paginadas con filtros
-     */
     public function index(Request $request): JsonResponse
     {
-        $query = MateriaCaso::withCount('tiposCasos')->ordenarPorNombre();
-
+        $query = MateriaCaso::withCount('tiposCasos');
+        
         // Búsqueda si se especifica
-        if ($request->has('q') && $request->q) {
+        if ($request->has('q')) {
             $query->buscar($request->q);
         }
-
-        $materias = $query->paginate($request->get('per_page', 50));
-
-        return response()->json([
-            'mensaje' => 'Lista de materias paginada',
-            'total'   => $materias->total(),
-            'data'    => $materias->items(),
-            'meta'    => [
-                'current_page'  => $materias->currentPage(),
-                'per_page'      => $materias->perPage(),
-                'next_page_url' => $materias->nextPageUrl(),
-                'prev_page_url' => $materias->previousPageUrl(),
-                'last_page'     => $materias->lastPage(),
-            ],
-        ], 200);
-    }
-
-    /**
-     * Mostrar todas las materias (sin límite)
-     */
-    public function todos(Request $request): JsonResponse
-    {
-        $query = MateriaCaso::withCount('tiposCasos')->ordenarPorNombre();
-
-        if ($request->has('q') && $request->q) {
-            $query->buscar($request->q);
-        }
-
-        $materias = $query->get();
+        
+        $materias = $query->orderBy('nombre')->paginate(50);
 
         return response()->json([
-            'mensaje' => 'Lista completa de materias',
-            'total'   => $materias->count(),
-            'data'    => $materias,
-        ], 200);
+            'data' => $materias->items(),
+            'paginacion' => [
+                'total' => $materias->total(),
+                'per_page' => $materias->perPage(),
+                'current_page' => $materias->currentPage(),
+                'last_page' => $materias->lastPage(),
+            ]
+        ]);
     }
 
-    /**
-     * Mostrar una materia específica
-     */
-    public function show($id): JsonResponse
-    {
-        $materia = MateriaCaso::with('tiposCasos')->withCount('tiposCasos')->find($id);
-
-        if (!$materia) {
-            return response()->json(['mensaje' => 'Materia no encontrada'], 404);
-        }
-
-        return response()->json([
-            'mensaje' => 'Materia encontrada',
-            'data' => $materia,
-            'puede_eliminar' => $materia->puedeEliminar()
-        ], 200);
-    }
-
-    /**
-     * Crear una nueva materia
-     */
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'nombre' => 'required|string|max:100|unique:materias_casos,nombre',
-            'descripcion' => 'nullable|string',
-        ], [
-            'nombre.required' => 'El nombre es obligatorio',
-            'nombre.unique' => 'Ya existe una materia con este nombre',
+            'descripcion' => 'nullable|string|max:2000',
         ]);
 
         $materia = MateriaCaso::create($validated);
@@ -95,9 +45,17 @@ class MateriaCasoController extends Controller
         ], 201);
     }
 
-    /**
-     * Actualizar una materia existente
-     */
+    public function show($id): JsonResponse
+    {
+        $materia = MateriaCaso::withCount('tiposCasos')->find($id);
+
+        if (!$materia) {
+            return response()->json(['mensaje' => 'Materia no encontrada'], 404);
+        }
+
+        return response()->json(['data' => $materia]);
+    }
+
     public function update(Request $request, $id): JsonResponse
     {
         $materia = MateriaCaso::find($id);
@@ -108,10 +66,7 @@ class MateriaCasoController extends Controller
 
         $validated = $request->validate([
             'nombre' => 'sometimes|required|string|max:100|unique:materias_casos,nombre,' . $id,
-            'descripcion' => 'nullable|string',
-        ], [
-            'nombre.required' => 'El nombre es obligatorio',
-            'nombre.unique' => 'Ya existe una materia con este nombre',
+            'descripcion' => 'nullable|string|max:2000',
         ]);
 
         $materia->update($validated);
@@ -119,12 +74,9 @@ class MateriaCasoController extends Controller
         return response()->json([
             'mensaje' => 'Materia actualizada correctamente',
             'data' => $materia
-        ], 200);
+        ]);
     }
 
-    /**
-     * Eliminar una materia (con validación)
-     */
     public function destroy($id): JsonResponse
     {
         $materia = MateriaCaso::withCount('tiposCasos')->find($id);
@@ -133,37 +85,15 @@ class MateriaCasoController extends Controller
             return response()->json(['mensaje' => 'Materia no encontrada'], 404);
         }
 
-        if (!$materia->puedeEliminar()) {
+        // Verificar si tiene tipos de casos asociados
+        if ($materia->tipos_casos_count > 0) {
             return response()->json([
-                'mensaje' => 'No se puede eliminar la materia porque tiene tipos de casos asociados',
-                'total_tipos_casos' => $materia->tipos_casos_count
+                'mensaje' => 'No se puede eliminar la materia porque tiene tipos de casos asociados'
             ], 422);
         }
 
         $materia->delete();
 
-        return response()->json(['mensaje' => 'Materia eliminada correctamente'], 200);
-    }
-
-    /**
-     * Búsqueda específica de materias
-     */
-    public function buscar(Request $request): JsonResponse
-    {
-        $request->validate([
-            'q' => 'required|string|min:2'
-        ]);
-
-        $materias = MateriaCaso::withCount('tiposCasos')
-            ->buscar($request->q)
-            ->ordenarPorNombre()
-            ->get();
-
-        return response()->json([
-            'mensaje' => 'Resultados de búsqueda',
-            'termino' => $request->q,
-            'total' => $materias->count(),
-            'data' => $materias
-        ], 200);
+        return response()->json(['mensaje' => 'Materia eliminada correctamente']);
     }
 }
