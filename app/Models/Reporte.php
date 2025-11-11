@@ -3,25 +3,20 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Reporte extends Model
 {
-    // 1. Nombre exacto de la tabla
     protected $table = 'reportes';
 
-    // 2. Clave primaria
     protected $primaryKey = 'id';
 
-    // 3. Auto‐incremental (IDENTITY en SQL Server)
     public $incrementing = true;
 
-    // 4. Tipo de la clave primaria
     protected $keyType = 'int';
 
-    // 5. Sin timestamps (la tabla no tiene created_at / updated_at)
     public $timestamps = false;
 
-    // 6. Campos asignables masivamente
     protected $fillable = [
         'titulo',
         'tipo_reporte',
@@ -31,15 +26,76 @@ class Reporte extends Model
         'generado_por',
     ];
 
-    // 7. Casts para tipos especiales y cifrado de datos sensibles
     protected $casts = [
-        'parametros'       => 'encrypted', // para proteger información sensible o parámetros
+        'parametros' => 'encrypted', //  datos sensibles, por eso se encriptan
         'fecha_generacion' => 'datetime',
     ];
 
-    // 8. Relación con el usuario que generó el reporte
-    public function usuario()
+    // TIPOS DE REPORTE PERMITIDOS
+    const TIPOS_REPORTE = [
+        'General',
+        'Calendario',
+        'Documentos',
+        'Clientes',
+        'Casos',
+    ];
+
+    // SCOPES PARA BÚSQUEDAS
+    public function scopePorTipo($query, $tipo)
+    {
+        return $query->where('tipo_reporte', $tipo);
+    }
+
+    public function scopePorUsuario($query, $usuarioId)
+    {
+        return $query->where('generado_por', $usuarioId);
+    }
+
+    public function scopeRecientes($query, $dias = 30)
+    {
+        return $query->where('fecha_generacion', '>=', now()->subDays($dias));
+    }
+
+    // RELACIÓN CON USUARIO
+    public function usuario(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'generado_por', 'id');
+    }
+
+    // VALIDACIÓN DE TIPO DE REPORTE
+    public function setTipoReporteAttribute($value)
+    {
+        if (! in_array($value, self::TIPOS_REPORTE)) {
+            throw new \InvalidArgumentException("Tipo de reporte no válido: $value");
+        }
+        $this->attributes['tipo_reporte'] = $value;
+    }
+
+    // MÉTODOS UTILITARIOS
+    public function getParametrosDecodificadosAttribute()
+    {
+        try {
+            return json_decode($this->parametros, true) ?? [];
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    public function getEsRecienteAttribute()
+    {
+        return $this->fecha_generacion >= now()->subDay();
+    }
+
+    // VALIDACIÓN AUTOMÁTICA
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::saving(function ($model) {
+            // Validar que el usuario existe
+            if (! \App\Models\Usuario::where('id', $model->generado_por)->exists()) {
+                throw new \Exception("El usuario con ID {$model->generado_por} no existe.");
+            }
+        });
     }
 }

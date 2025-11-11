@@ -4,35 +4,31 @@ namespace App\Http\Controllers;
 
 use App\Models\MateriaCaso;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Crypt;
+use Illuminate\Http\JsonResponse;
 
 class MateriaCasoController extends Controller
 {
     /**
-     * Mostrar materias paginadas (50 por página)
+     * Mostrar materias paginadas con filtros
      */
-    public function index()
+    public function index(Request $request): JsonResponse
     {
-        $materias = MateriaCaso::paginate(50);
+        $query = MateriaCaso::withCount('tiposCasos')->ordenarPorNombre();
 
-        // Desencriptar descripciones antes de devolverlas
-        $materias->getCollection()->transform(function ($materia) {
-            if ($materia->descripcion) {
-                try {
-                    $materia->descripcion = Crypt::decryptString($materia->descripcion);
-                } catch (\Exception $e) {
-                    // Si ya está en texto plano o hay error de descifrado, la dejamos igual
-                }
-            }
-            return $materia;
-        });
+        // Búsqueda si se especifica
+        if ($request->has('q') && $request->q) {
+            $query->buscar($request->q);
+        }
+
+        $materias = $query->paginate($request->get('per_page', 50));
 
         return response()->json([
             'mensaje' => 'Lista de materias paginada',
             'total'   => $materias->total(),
             'data'    => $materias->items(),
-            'links'   => [
+            'meta'    => [
                 'current_page'  => $materias->currentPage(),
+                'per_page'      => $materias->perPage(),
                 'next_page_url' => $materias->nextPageUrl(),
                 'prev_page_url' => $materias->previousPageUrl(),
                 'last_page'     => $materias->lastPage(),
@@ -43,22 +39,15 @@ class MateriaCasoController extends Controller
     /**
      * Mostrar todas las materias (sin límite)
      */
-    public function todos()
+    public function todos(Request $request): JsonResponse
     {
-        ini_set('memory_limit', '2G');
+        $query = MateriaCaso::withCount('tiposCasos')->ordenarPorNombre();
 
-        $materias = MateriaCaso::all();
+        if ($request->has('q') && $request->q) {
+            $query->buscar($request->q);
+        }
 
-        $materias->transform(function ($materia) {
-            if ($materia->descripcion) {
-                try {
-                    $materia->descripcion = Crypt::decryptString($materia->descripcion);
-                } catch (\Exception $e) {
-                    // Si falla la desencriptación, la dejamos como está
-                }
-            }
-            return $materia;
-        });
+        $materias = $query->get();
 
         return response()->json([
             'mensaje' => 'Lista completa de materias',
@@ -68,96 +57,113 @@ class MateriaCasoController extends Controller
     }
 
     /**
-     * Crear una nueva materia.
+     * Mostrar una materia específica
      */
-    public function store(Request $request)
+    public function show($id): JsonResponse
     {
-        $request->validate([
-            'nombre' => 'required|string|max:100',
-            'descripcion' => 'nullable|string',
-        ]);
-
-        $materia = MateriaCaso::create([
-            'nombre' => $request->nombre,
-            'descripcion' => $request->descripcion ? Crypt::encryptString($request->descripcion) : null,
-        ]);
-
-        return response()->json([
-            'mensaje' => 'Materia creada correctamente',
-            'materia' => $materia
-        ], 201);
-    }
-
-    /**
-     * Mostrar una materia específica.
-     */
-    public function show($id)
-    {
-        $materia = MateriaCaso::find($id);
+        $materia = MateriaCaso::with('tiposCasos')->withCount('tiposCasos')->find($id);
 
         if (!$materia) {
             return response()->json(['mensaje' => 'Materia no encontrada'], 404);
         }
 
-        // Desencriptar descripción antes de devolverla
-        if ($materia->descripcion) {
-            try {
-                $materia->descripcion = Crypt::decryptString($materia->descripcion);
-            } catch (\Exception $e) {
-                // En caso de que ya esté en texto plano o haya error
-            }
-        }
-
-        return response()->json($materia, 200);
-    }
-
-    /**
-     * Actualizar una materia existente.
-     */
-    public function update(Request $request, $id)
-    {
-        $materia = MateriaCaso::find($id);
-
-        if (!$materia) {
-            return response()->json(['mensaje' => 'Materia no encontrada'], 404);
-        }
-
-        $request->validate([
-            'nombre' => 'sometimes|required|string|max:100',
-            'descripcion' => 'nullable|string',
-        ]);
-
-        if ($request->has('nombre')) {
-            $materia->nombre = $request->nombre;
-        }
-
-        if ($request->has('descripcion')) {
-            $materia->descripcion = $request->descripcion
-                ? Crypt::encryptString($request->descripcion)
-                : null;
-        }
-
-        $materia->save();
-
         return response()->json([
-            'mensaje' => 'Materia actualizada correctamente',
-            'materia' => $materia
+            'mensaje' => 'Materia encontrada',
+            'data' => $materia,
+            'puede_eliminar' => $materia->puedeEliminar()
         ], 200);
     }
 
     /**
-     * Eliminar una materia.
+     * Crear una nueva materia
      */
-    public function destroy($id)
+    public function store(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'nombre' => 'required|string|max:100|unique:materias_casos,nombre',
+            'descripcion' => 'nullable|string',
+        ], [
+            'nombre.required' => 'El nombre es obligatorio',
+            'nombre.unique' => 'Ya existe una materia con este nombre',
+        ]);
+
+        $materia = MateriaCaso::create($validated);
+
+        return response()->json([
+            'mensaje' => 'Materia creada correctamente',
+            'data' => $materia
+        ], 201);
+    }
+
+    /**
+     * Actualizar una materia existente
+     */
+    public function update(Request $request, $id): JsonResponse
     {
         $materia = MateriaCaso::find($id);
 
         if (!$materia) {
             return response()->json(['mensaje' => 'Materia no encontrada'], 404);
+        }
+
+        $validated = $request->validate([
+            'nombre' => 'sometimes|required|string|max:100|unique:materias_casos,nombre,' . $id,
+            'descripcion' => 'nullable|string',
+        ], [
+            'nombre.required' => 'El nombre es obligatorio',
+            'nombre.unique' => 'Ya existe una materia con este nombre',
+        ]);
+
+        $materia->update($validated);
+
+        return response()->json([
+            'mensaje' => 'Materia actualizada correctamente',
+            'data' => $materia
+        ], 200);
+    }
+
+    /**
+     * Eliminar una materia (con validación)
+     */
+    public function destroy($id): JsonResponse
+    {
+        $materia = MateriaCaso::withCount('tiposCasos')->find($id);
+
+        if (!$materia) {
+            return response()->json(['mensaje' => 'Materia no encontrada'], 404);
+        }
+
+        if (!$materia->puedeEliminar()) {
+            return response()->json([
+                'mensaje' => 'No se puede eliminar la materia porque tiene tipos de casos asociados',
+                'total_tipos_casos' => $materia->tipos_casos_count
+            ], 422);
         }
 
         $materia->delete();
 
         return response()->json(['mensaje' => 'Materia eliminada correctamente'], 200);
+    }
+
+    /**
+     * Búsqueda específica de materias
+     */
+    public function buscar(Request $request): JsonResponse
+    {
+        $request->validate([
+            'q' => 'required|string|min:2'
+        ]);
+
+        $materias = MateriaCaso::withCount('tiposCasos')
+            ->buscar($request->q)
+            ->ordenarPorNombre()
+            ->get();
+
+        return response()->json([
+            'mensaje' => 'Resultados de búsqueda',
+            'termino' => $request->q,
+            'total' => $materias->count(),
+            'data' => $materias
+        ], 200);
     }
 }

@@ -4,24 +4,40 @@ namespace App\Http\Controllers;
 
 use App\Models\Reporte;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\DB;
 
 class ReporteController extends Controller
 {
     /**
-     * Mostrar reportes paginados (50 por página)
+     * Mostrar reportes paginados con filtros
      */
-    public function index()
+    public function index(Request $request): JsonResponse
     {
-        $reportes = Reporte::with('usuario')->paginate(50);
+        $query = Reporte::with('usuario')->orderBy('fecha_generacion', 'desc');
+
+        // Filtros
+        if ($request->has('tipo_reporte') && $request->tipo_reporte) {
+            $query->porTipo($request->tipo_reporte);
+        }
+
+        if ($request->has('usuario_id') && $request->usuario_id) {
+            $query->porUsuario($request->usuario_id);
+        }
+
+        if ($request->has('recientes') && $request->recientes) {
+            $query->recientes($request->get('dias', 7));
+        }
+
+        $reportes = $query->paginate($request->get('per_page', 50));
 
         return response()->json([
             'mensaje' => 'Lista de reportes paginada',
             'total'   => $reportes->total(),
             'data'    => $reportes->items(),
-            'links'   => [
+            'meta'    => [
                 'current_page'  => $reportes->currentPage(),
+                'per_page'      => $reportes->perPage(),
                 'next_page_url' => $reportes->nextPageUrl(),
                 'prev_page_url' => $reportes->previousPageUrl(),
                 'last_page'     => $reportes->lastPage(),
@@ -30,13 +46,24 @@ class ReporteController extends Controller
     }
 
     /**
-     * Mostrar todos los reportes (sin límite)
+     * Mostrar todos los reportes (sin límite) con filtros opcionales
      */
-    public function todos()
+    public function todos(Request $request): JsonResponse
     {
-        ini_set('memory_limit', '2G');
+        // ini_set('memory_limit', '2G'); // Solo si es realmente necesario
 
-        $reportes = Reporte::with('usuario')->get();
+        $query = Reporte::with('usuario')->orderBy('fecha_generacion', 'desc');
+
+        // Filtros opcionales
+        if ($request->has('tipo_reporte') && $request->tipo_reporte) {
+            $query->porTipo($request->tipo_reporte);
+        }
+
+        if ($request->has('usuario_id') && $request->usuario_id) {
+            $query->porUsuario($request->usuario_id);
+        }
+
+        $reportes = $query->get();
 
         return response()->json([
             'mensaje' => 'Lista completa de reportes',
@@ -46,101 +73,225 @@ class ReporteController extends Controller
     }
 
     /**
-     * Mostrar un reporte por su ID.
+     * Mostrar un reporte por su ID con parámetros decodificados
      */
-    public function show($id)
+    public function show($id): JsonResponse
     {
         $reporte = Reporte::with('usuario')->find($id);
 
         if (!$reporte) {
-            return response()->json(['message' => 'Reporte no encontrado'], 404);
+            return response()->json([
+                'mensaje' => 'Reporte no encontrado'
+            ], 404);
         }
 
-        return response()->json($reporte);
+        return response()->json([
+            'mensaje' => 'Reporte encontrado',
+            'data' => $reporte,
+            'parametros_decodificados' => $reporte->parametros_decodificados
+        ], 200);
     }
 
     /**
-     * Crear un nuevo reporte.
+     * Crear un nuevo reporte con parámetros encriptados automáticamente
      */
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
             'titulo' => 'required|string|max:150',
             'tipo_reporte' => 'required|string|in:General,Calendario,Documentos,Clientes,Casos',
             'descripcion' => 'nullable|string',
-            'parametros' => 'nullable|string',
+            'parametros' => 'nullable|array', // ✅ Cambiado a array para encriptación automática
             'generado_por' => 'required|integer|exists:usuarios,id',
+        ], [
+            'tipo_reporte.in' => 'El tipo de reporte debe ser: General, Calendario, Documentos, Clientes o Casos',
+            'generado_por.exists' => 'El usuario especificado no existe'
         ]);
 
         if ($validator->fails()) {
             return response()->json([
-                'message' => 'Error de validación',
-                'errors' => $validator->errors()
+                'mensaje' => 'Error de validación',
+                'errores' => $validator->errors()
             ], 422);
         }
 
-        $reporte = Reporte::create([
-            'titulo' => $request->titulo,
-            'tipo_reporte' => $request->tipo_reporte,
-            'descripcion' => $request->descripcion,
-            'parametros' => $request->parametros,
-            'fecha_generacion' => DB::raw('GETDATE()'),
-            'generado_por' => $request->generado_por,
-        ]);
+        $data = $request->all();
+        
+        // ✅ Convertir parámetros a JSON para encriptación automática
+        if (isset($data['parametros']) && is_array($data['parametros'])) {
+            $data['parametros'] = json_encode($data['parametros']);
+        }
+
+        // ✅ No necesitas fecha_generacion - la BD usa GETDATE() por defecto
+        $reporte = Reporte::create($data);
 
         return response()->json([
-            'message' => 'Reporte creado correctamente',
-            'data' => $reporte
+            'mensaje' => 'Reporte creado correctamente',
+            'data' => $reporte->load('usuario'),
+            'parametros_decodificados' => $reporte->parametros_decodificados
         ], 201);
     }
 
     /**
-     * Actualizar un reporte existente.
+     * Actualizar un reporte existente
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, $id): JsonResponse
     {
         $reporte = Reporte::find($id);
 
         if (!$reporte) {
-            return response()->json(['message' => 'Reporte no encontrado'], 404);
+            return response()->json([
+                'mensaje' => 'Reporte no encontrado'
+            ], 404);
         }
 
         $validator = Validator::make($request->all(), [
             'titulo' => 'sometimes|required|string|max:150',
             'tipo_reporte' => 'sometimes|required|string|in:General,Calendario,Documentos,Clientes,Casos',
             'descripcion' => 'nullable|string',
-            'parametros' => 'nullable|string',
+            'parametros' => 'nullable|array', // ✅ Cambiado a array
             'generado_por' => 'sometimes|required|integer|exists:usuarios,id',
+        ], [
+            'tipo_reporte.in' => 'El tipo de reporte debe ser: General, Calendario, Documentos, Clientes o Casos',
+            'generado_por.exists' => 'El usuario especificado no existe'
         ]);
 
         if ($validator->fails()) {
             return response()->json([
-                'message' => 'Error de validación',
-                'errors' => $validator->errors()
+                'mensaje' => 'Error de validación',
+                'errores' => $validator->errors()
             ], 422);
         }
 
-        $reporte->update($request->all());
+        $data = $request->all();
+        
+        // ✅ Convertir parámetros a JSON para encriptación automática
+        if (isset($data['parametros']) && is_array($data['parametros'])) {
+            $data['parametros'] = json_encode($data['parametros']);
+        }
+
+        $reporte->update($data);
 
         return response()->json([
-            'message' => 'Reporte actualizado correctamente',
-            'data' => $reporte
-        ]);
+            'mensaje' => 'Reporte actualizado correctamente',
+            'data' => $reporte->load('usuario'),
+            'parametros_decodificados' => $reporte->parametros_decodificados
+        ], 200);
     }
 
     /**
-     * Eliminar un reporte.
+     * Eliminar un reporte
      */
-    public function destroy($id)
+    public function destroy($id): JsonResponse
     {
         $reporte = Reporte::find($id);
 
         if (!$reporte) {
-            return response()->json(['message' => 'Reporte no encontrado'], 404);
+            return response()->json([
+                'mensaje' => 'Reporte no encontrado'
+            ], 404);
         }
 
         $reporte->delete();
 
-        return response()->json(['message' => 'Reporte eliminado correctamente']);
+        return response()->json([
+            'mensaje' => 'Reporte eliminado correctamente'
+        ], 200);
+    }
+
+    /**
+     * 🆕 Búsqueda de reportes por término
+     */
+    public function buscar(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'q' => 'required|string|min:2',
+            'tipo_reporte' => 'nullable|string|in:General,Calendario,Documentos,Clientes,Casos',
+            'usuario_id' => 'nullable|integer|exists:usuarios,id'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'mensaje' => 'Error de validación',
+                'errores' => $validator->errors()
+            ], 422);
+        }
+
+        $query = Reporte::with('usuario')
+            ->where('titulo', 'LIKE', "%{$request->q}%")
+            ->orWhere('descripcion', 'LIKE', "%{$request->q}%");
+
+        // Filtros adicionales
+        if ($request->has('tipo_reporte') && $request->tipo_reporte) {
+            $query->porTipo($request->tipo_reporte);
+        }
+
+        if ($request->has('usuario_id') && $request->usuario_id) {
+            $query->porUsuario($request->usuario_id);
+        }
+
+        $reportes = $query->orderBy('fecha_generacion', 'desc')->get();
+
+        return response()->json([
+            'mensaje' => 'Resultados de búsqueda',
+            'termino' => $request->q,
+            'total' => $reportes->count(),
+            'data' => $reportes
+        ], 200);
+    }
+
+    /**
+     * 🆕 Reportes por usuario específico
+     */
+    public function porUsuario($usuarioId): JsonResponse
+    {
+        $reportes = Reporte::with('usuario')
+            ->porUsuario($usuarioId)
+            ->orderBy('fecha_generacion', 'desc')
+            ->get();
+
+        return response()->json([
+            'mensaje' => 'Reportes del usuario',
+            'usuario_id' => $usuarioId,
+            'total' => $reportes->count(),
+            'data' => $reportes
+        ], 200);
+    }
+
+    /**
+     * 🆕 Estadísticas de reportes
+     */
+    public function estadisticas(): JsonResponse
+    {
+        $total = Reporte::count();
+        
+        $porTipo = Reporte::selectRaw('tipo_reporte, COUNT(*) as total')
+            ->groupBy('tipo_reporte')
+            ->get()
+            ->pluck('total', 'tipo_reporte');
+
+        $recientes = Reporte::recientes(7)->count();
+        $hoy = Reporte::whereDate('fecha_generacion', today())->count();
+
+        return response()->json([
+            'mensaje' => 'Estadísticas de reportes',
+            'data' => [
+                'total_reportes' => $total,
+                'reportes_por_tipo' => $porTipo,
+                'reportes_ultimos_7_dias' => $recientes,
+                'reportes_hoy' => $hoy
+            ]
+        ], 200);
+    }
+
+    /**
+     * 🆕 Tipos de reporte disponibles
+     */
+    public function tipos(): JsonResponse
+    {
+        return response()->json([
+            'mensaje' => 'Tipos de reporte disponibles',
+            'data' => Reporte::TIPOS_REPORTE
+        ], 200);
     }
 }
