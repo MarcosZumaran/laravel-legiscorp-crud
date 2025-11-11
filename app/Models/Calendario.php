@@ -27,7 +27,6 @@ class Calendario extends Model
         'color',
         'recurrente',
         'caso_id',
-        // 'etapa_id', // ❌ ELIMINADO - ya no existe
         'abogado_id',
         'cliente_id',
         'creado_por',
@@ -42,12 +41,12 @@ class Calendario extends Model
         'descripcion' => 'encrypted',
     ];
 
-    // 🎯 VALORES PERMITIDOS
+    // VALORES PERMITIDOS
     const TIPOS_EVENTO = ['Audiencia', 'Reunión', 'Plazo', 'Entrega', 'Otro'];
     const ESTADOS = ['Pendiente', 'Completado', 'Cancelado'];
     const RECURRENCIAS = ['No', 'Diario', 'Semanal', 'Mensual', 'Anual'];
 
-    // 🎯 ATRIBUTOS POR DEFECTO
+    // ATRIBUTOS POR DEFECTO
     protected $attributes = [
         'tipo_evento' => 'Otro',
         'estado' => 'Pendiente',
@@ -55,17 +54,11 @@ class Calendario extends Model
         'recurrente' => 'No',
     ];
 
-    // 🎯 RELACIONES (sin etapa)
+    // RELACIONES
     public function caso(): BelongsTo
     {
         return $this->belongsTo(Caso::class, 'caso_id');
     }
-
-    // ❌ ELIMINADO: relación con etapa
-    // public function etapa(): BelongsTo
-    // {
-    //     return $this->belongsTo(EtapaProcesal::class, 'etapa_id');
-    // }
 
     public function abogado(): BelongsTo
     {
@@ -82,7 +75,7 @@ class Calendario extends Model
         return $this->belongsTo(Usuario::class, 'creado_por');
     }
 
-    // 🎯 SCOPES PARA BÚSQUEDAS (sin cambios)
+    // SCOPES PARA BÚSQUEDAS (sin cambios)
     public function scopePorTipo($query, $tipo)
     {
         return $query->where('tipo_evento', $tipo);
@@ -138,7 +131,7 @@ class Calendario extends Model
                     ->orWhere('expediente', 'LIKE', "%{$termino}%");
     }
 
-    // 🎯 ATRIBUTOS CALCULADOS (sin cambios)
+    // ATRIBUTOS CALCULADOS (sin cambios)
     public function getEstaPendienteAttribute()
     {
         return $this->estado === 'Pendiente';
@@ -186,7 +179,7 @@ class Calendario extends Model
             : $this->descripcion;
     }
 
-    // 🎯 MÉTODOS UTILITARIOS (sin cambios)
+    // MÉTODOS UTILITARIOS (sin cambios)
     public function completar()
     {
         $this->update(['estado' => 'Completado']);
@@ -210,7 +203,7 @@ class Calendario extends Model
         return $this->esta_pendiente;
     }
 
-    // 🎯 VALIDACIÓN AUTOMÁTICA (sin etapa_id)
+    // VALIDACIÓN AUTOMÁTICA (sin etapa_id)
     protected static function boot()
     {
         parent::boot();

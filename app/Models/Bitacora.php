@@ -25,10 +25,10 @@ class Bitacora extends Model
 
     protected $casts = [
         'fecha' => 'datetime',
-        'accion' => 'encrypted', // ✅ Encriptar acciones (pueden contener info sensible)
+        'accion' => 'encrypted',
     ];
 
-    // 🎯 TIPOS DE ACCIÓN COMUNES
+    // TIPOS DE ACCIÓN COMUNES
     const ACCIONES = [
         'LOGIN',
         'LOGOUT',
@@ -41,18 +41,18 @@ class Bitacora extends Model
         'ACCESO_DENEGADO'
     ];
 
-    // 🎯 ATRIBUTOS POR DEFECTO
+    // ATRIBUTOS POR DEFECTO
     protected $attributes = [
         'fecha' => null, // La BD usa GETDATE() por defecto
     ];
 
-    // 🎯 RELACIONES
+    // RELACIONES
     public function usuario(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'usuario_id');
     }
 
-    // 🎯 SCOPES PARA BÚSQUEDAS
+    // SCOPES PARA BÚSQUEDAS
     public function scopePorUsuario($query, $usuarioId)
     {
         return $query->where('usuario_id', $usuarioId);
@@ -99,7 +99,7 @@ class Bitacora extends Model
                     });
     }
 
-    // 🎯 ATRIBUTOS CALCULADOS
+    // ATRIBUTOS CALCULADOS
     public function getAccionCortaAttribute()
     {
         return strlen($this->accion) > 100 
@@ -127,7 +127,7 @@ class Bitacora extends Model
         return 'OTRO';
     }
 
-    // 🎯 MÉTODOS UTILITARIOS
+    // MÉTODOS UTILITARIOS
     public static function registrar($usuarioId, $accion, $ip = null)
     {
         return self::create([
@@ -146,12 +146,12 @@ class Bitacora extends Model
                   ->get();
     }
 
-    // 🎯 VALIDACIÓN AUTOMÁTICA
+    // VALIDACIÓN AUTOMÁTICA
     protected static function boot()
     {
         parent::boot();
 
-        // ⚠️ La bitácora es de solo lectura - prevenir modificaciones/eliminaciones
+        // La bitácora es de solo lectura - prevenir modificaciones/eliminaciones
         static::updating(function ($model) {
             throw new \Exception("Los registros de bitácora no pueden ser modificados.");
         });

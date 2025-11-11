@@ -28,16 +28,16 @@ class DocumentoCompartido extends Model
         'fecha_compartido' => 'datetime',
     ];
 
-    // 🎯 VALORES PERMITIDOS
+    // VALORES PERMITIDOS
     const PERMISOS_VALIDOS = ['lectura', 'escritura'];
     const ROLES_VALIDOS = ['admin', 'abogado', 'cliente', 'asistente']; // Ajusta según tus roles
 
-    // 🎯 ATRIBUTOS POR DEFECTO
+    // ATRIBUTOS POR DEFECTO
     protected $attributes = [
         'permisos' => 'lectura',
     ];
 
-    // 🎯 RELACIONES
+    // RELACIONES
     public function documento(): BelongsTo
     {
         return $this->belongsTo(Documento::class, 'documento_id');
@@ -53,7 +53,7 @@ class DocumentoCompartido extends Model
         return $this->belongsTo(Usuario::class, 'compartido_por');
     }
 
-    // 🎯 SCOPES PARA BÚSQUEDAS
+    // SCOPES PARA BÚSQUEDAS
     public function scopePorDocumento($query, $documentoId)
     {
         return $query->where('documento_id', $documentoId);
@@ -102,7 +102,7 @@ class DocumentoCompartido extends Model
         });
     }
 
-    // 🎯 ATRIBUTOS CALCULADOS
+    // ATRIBUTOS CALCULADOS
     public function getTienePermisoEscrituraAttribute()
     {
         return $this->permisos === 'escritura';
@@ -139,7 +139,7 @@ class DocumentoCompartido extends Model
         return 'Destinatario no especificado';
     }
 
-    // 🎯 MÉTODOS UTILITARIOS
+    // MÉTODOS UTILITARIOS
     public function puedeEditar()
     {
         // Lógica para determinar si se puede editar este registro
@@ -169,7 +169,7 @@ class DocumentoCompartido extends Model
         return false;
     }
 
-    // 🎯 VALIDACIÓN AUTOMÁTICA
+    // VALIDACIÓN AUTOMÁTICA
     protected static function boot()
     {
         parent::boot();

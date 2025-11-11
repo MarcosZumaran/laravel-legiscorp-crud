@@ -35,28 +35,28 @@ class Cliente extends Model
 
     protected $casts = [
         'creado_en' => 'datetime',
-        'correo' => 'encrypted',    // ✅ Encriptación automática
-        'telefono' => 'encrypted',  // ✅ Encriptación automática
+        'correo' => 'encrypted',    
+        'telefono' => 'encrypted',  
     ];
 
-    // 🎯 VALORES PERMITIDOS
+    // VALORES PERMITIDOS
     const TIPOS_PERSONA = ['Jurídica', 'Natural'];
     const TIPOS_DOCUMENTO = ['Pasaporte', 'RUC', 'DNI'];
     const ESTADOS = ['Activo', 'Inactivo'];
 
-    // 🎯 ATRIBUTOS POR DEFECTO
+    // ATRIBUTOS POR DEFECTO
     protected $attributes = [
         'estado' => 'Activo',
         'creado_en' => null, // La BD usa GETDATE() por defecto
     ];
 
-    // 🎯 RELACIONES
+    // RELACIONES
     public function documentos(): HasMany
     {
         return $this->hasMany(Documento::class, 'cliente_id');
     }
 
-    // 🎯 SCOPES PARA BÚSQUEDAS
+    // SCOPES PARA BÚSQUEDAS
     public function scopePorTipoPersona($query, $tipo)
     {
         return $query->where('tipo_persona', $tipo);
@@ -91,7 +91,7 @@ class Cliente extends Model
         return $query->where('creado_en', '>=', now()->subDays($dias));
     }
 
-    // 🎯 ATRIBUTOS CALCULADOS
+    // ATRIBUTOS CALCULADOS
     public function getNombreCompletoAttribute()
     {
         if ($this->tipo_persona === 'Jurídica') {
@@ -126,7 +126,7 @@ class Cliente extends Model
         return implode(' | ', $contacto) ?: 'Sin información de contacto';
     }
 
-    // 🎯 MÉTODOS UTILITARIOS
+    // MÉTODOS UTILITARIOS
     public static function buscarPorDocumento($numeroDocumento)
     {
         return self::where('numero_documento', $numeroDocumento)->first();
@@ -148,7 +148,7 @@ class Cliente extends Model
         $this->update(['estado' => 'Inactivo']);
     }
 
-    // 🎯 VALIDACIÓN AUTOMÁTICA
+    // VALIDACIÓN AUTOMÁTICA
     protected static function boot()
     {
         parent::boot();

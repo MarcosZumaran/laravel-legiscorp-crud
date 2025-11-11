@@ -30,21 +30,21 @@ class Documento extends Model
         'caso_id',
         'cliente_id',
         'categoria',
-        'tamano_bytes',      // ✅ Añadido
-        'es_carpeta',        // ✅ Añadido
-        'carpeta_padre_id',  // ✅ Añadido
-        'es_publico',        // ✅ Añadido
-        'etiquetas',         // ✅ Añadido
+        'tamano_bytes',
+        'es_carpeta',
+        'carpeta_padre_id',
+        'es_publico',
+        'etiquetas',
     ];
 
     protected $casts = [
         'fecha_subida' => 'datetime',
-        'es_carpeta' => 'boolean',     // ✅ Añadido
-        'es_publico' => 'boolean',     // ✅ Añadido
-        'tamano_bytes' => 'integer',   // ✅ Añadido
+        'es_carpeta' => 'boolean',
+        'es_publico' => 'boolean',
+        'tamano_bytes' => 'integer',
     ];
 
-    // 🎯 CATEGORÍAS PERMITIDAS
+    // CATEGORÍAS PERMITIDAS
     const CATEGORIAS = [
         'General',
         'Contrato',
@@ -54,7 +54,7 @@ class Documento extends Model
         'Otro'
     ];
 
-    // 🎯 RELACIONES
+    // RELACIONES
     public function usuario(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'subido_por');
@@ -124,7 +124,7 @@ class Documento extends Model
         return $query->where('fecha_subida', '>=', now()->subDays($dias));
     }
 
-    // 🎯 ATRIBUTOS CALCULADOS
+    // ATRIBUTOS CALCULADOS
     public function getTamanoFormateadoAttribute()
     {
         if (!$this->tamano_bytes) return '0 Bytes';
@@ -154,7 +154,7 @@ class Documento extends Model
         return $this->etiquetas ? explode(',', $this->etiquetas) : [];
     }
 
-    // 🎯 MÉTODOS UTILITARIOS
+    // MÉTODOS UTILITARIOS
     public function esImagen()
     {
         return in_array($this->tipo_archivo, ['jpg', 'jpeg', 'png', 'gif', 'webp']);
@@ -171,7 +171,7 @@ class Documento extends Model
         return !$this->archivosHijos()->exists();
     }
 
-    // 🎯 VALIDACIÓN DE CATEGORÍA
+    // VALIDACIÓN DE CATEGORÍA
     public function setCategoriaAttribute($value)
     {
         if (!in_array($value, self::CATEGORIAS)) {
@@ -189,7 +189,7 @@ class Documento extends Model
         }
     }
 
-    // 🎯 VALIDACIÓN AUTOMÁTICA
+    // VALIDACIÓN AUTOMÁTICA
     protected static function boot()
     {
         parent::boot();

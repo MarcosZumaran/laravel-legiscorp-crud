@@ -27,15 +27,15 @@ class ComentarioCaso extends Model
 
     protected $casts = [
         'fecha' => 'datetime',
-        'comentario' => 'encrypted', // ✅ Encriptar comentarios (pueden ser sensibles)
+        'comentario' => 'encrypted',
     ];
 
-    // 🎯 ATRIBUTOS POR DEFECTO
+    // ATRIBUTOS POR DEFECTO
     protected $attributes = [
         'fecha' => null, // La BD usa GETDATE() por defecto
     ];
 
-    // 🎯 RELACIONES
+    // RELACIONES
     public function caso(): BelongsTo
     {
         return $this->belongsTo(Caso::class, 'caso_id');
@@ -46,7 +46,7 @@ class ComentarioCaso extends Model
         return $this->belongsTo(Usuario::class, 'usuario_id');
     }
 
-    // 🎯 SCOPES PARA BÚSQUEDAS
+    // SCOPES PARA BÚSQUEDAS
     public function scopePorCaso($query, $casoId)
     {
         return $query->where('caso_id', $casoId);
@@ -67,7 +67,7 @@ class ComentarioCaso extends Model
         return $query->orderBy('fecha', $direccion);
     }
 
-    // 🎯 ATRIBUTOS CALCULADOS
+    // ATRIBUTOS CALCULADOS
     public function getComentarioCortoAttribute()
     {
         if (empty($this->comentario)) {
@@ -89,7 +89,7 @@ class ComentarioCaso extends Model
         return $this->fecha ? $this->fecha->format('d/m/Y H:i') : 'Sin fecha';
     }
 
-    // 🎯 MÉTODOS UTILITARIOS
+    // MÉTODOS UTILITARIOS
     public static function obtenerPorCaso($casoId)
     {
         return self::porCaso($casoId)
@@ -103,7 +103,7 @@ class ComentarioCaso extends Model
         return self::porCaso($casoId)->count();
     }
 
-    // 🎯 VALIDACIÓN AUTOMÁTICA
+    // VALIDACIÓN AUTOMÁTICA
     protected static function boot()
     {
         parent::boot();

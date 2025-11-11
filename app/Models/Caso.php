@@ -19,8 +19,8 @@ class Caso extends Model
 
     protected $fillable = [
         'codigo_caso',
-        'numero_expediente',      // ✅ Campo real en la tabla
-        'numero_carpeta_fiscal',  // ✅ Campo real en la tabla
+        'numero_expediente',
+        'numero_carpeta_fiscal', 
         'titulo',
         'descripcion',
         'materia_id',
@@ -31,28 +31,25 @@ class Caso extends Model
         'cliente_id',
         'abogado_id',
         'contraparte',
-        'juzgado',                // ✅ Campo real en la tabla
-        'fiscal',                 // ✅ Campo real en la tabla
-        'creado_en',              // ✅ Campo real en la tabla
+        'juzgado',
+        'fiscal',
+        'creado_en',
     ];
 
     protected $casts = [
         'fecha_inicio' => 'date',
         'fecha_cierre' => 'date',
         'creado_en' => 'datetime',
-        'descripcion' => 'encrypted', // ✅ Encriptar descripción (puede contener info sensible)
+        'descripcion' => 'encrypted',
     ];
 
-    // 🎯 VALORES PERMITIDOS
     const ESTADOS = ['Abierto', 'En Proceso', 'Cerrado'];
 
-    // 🎯 ATRIBUTOS POR DEFECTO
     protected $attributes = [
         'estado' => 'Abierto',
-        'creado_en' => null, // La BD usa GETDATE() por defecto
+        'creado_en' => null,
     ];
 
-    // 🎯 RELACIONES
     public function cliente(): BelongsTo
     {
         return $this->belongsTo(Cliente::class, 'cliente_id');
@@ -83,7 +80,7 @@ class Caso extends Model
         return $this->hasMany(Documento::class, 'caso_id');
     }
 
-    // 🎯 SCOPES PARA BÚSQUEDAS
+    //SCOPES PARA BÚSQUEDAS
     public function scopePorEstado($query, $estado)
     {
         return $query->where('estado', $estado);
@@ -129,7 +126,7 @@ class Caso extends Model
         return $query->orderBy('creado_en', $direccion);
     }
 
-    // 🎯 ATRIBUTOS CALCULADOS
+    // ATRIBUTOS CALCULADOS
     public function getEstaActivoAttribute()
     {
         return $this->estado !== 'Cerrado';
@@ -169,7 +166,7 @@ class Caso extends Model
         return implode(' | ', $info) ?: 'Sin información adicional';
     }
 
-    // 🎯 MÉTODOS UTILITARIOS
+    // MÉTODOS UTILITARIOS
     public static function buscarPorCodigo($codigoCaso)
     {
         return self::where('codigo_caso', $codigoCaso)->first();
@@ -202,7 +199,7 @@ class Caso extends Model
         $this->update(['estado' => 'En Proceso']);
     }
 
-    // 🎯 VALIDACIÓN AUTOMÁTICA
+    // VALIDACIÓN AUTOMÁTICA
     protected static function boot()
     {
         parent::boot();
