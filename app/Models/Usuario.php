@@ -4,11 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use ESolution\DBEncryption\Traits\EncryptedAttribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Facades\Hash;
 
 class Usuario extends Model
 {
-    use EncryptedAttribute;
+    use EncryptedAttribute, HasFactory;
 
     protected $table = 'usuarios';
     protected $primaryKey = 'id';

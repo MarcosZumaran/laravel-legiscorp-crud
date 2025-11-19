@@ -4,9 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class TiposCasos extends Model
 {
+    use HasFactory;
     // Configuración básica
     protected $table = 'tipos_casos';
     protected $primaryKey = 'id';

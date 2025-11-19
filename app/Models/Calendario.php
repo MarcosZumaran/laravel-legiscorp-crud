@@ -5,10 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use ESolution\DBEncryption\Traits\EncryptedAttribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Calendario extends Model
 {
-    use EncryptedAttribute;
+    use EncryptedAttribute, HasFactory;
 
     protected $table = 'calendario';
     protected $primaryKey = 'id';

@@ -11,20 +11,20 @@ class ReporteController extends Controller
     public function index(Request $request): JsonResponse
     {
         $query = Reporte::with('usuario');
-        
+
         // Filtros
         if ($request->has('tipo')) {
             $query->porTipo($request->tipo);
         }
-        
+
         if ($request->has('usuario_id')) {
             $query->porUsuario($request->usuario_id);
         }
-        
+
         if ($request->has('recientes')) {
             $query->recientes($request->get('recientes', 30));
         }
-        
+
         $reportes = $query->orderBy('fecha_generacion', 'desc')->paginate(50);
 
         return response()->json([
@@ -44,7 +44,7 @@ class ReporteController extends Controller
             'titulo' => 'required|string|max:150',
             'tipo_reporte' => 'required|string|in:General,Calendario,Documentos,Clientes,Casos',
             'descripcion' => 'nullable|string',
-            'parametros' => 'nullable|array',
+            'parametros' => 'nullable|string',
             'generado_por' => 'required|integer|exists:usuarios,id',
         ]);
 
